@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="汉字闪卡">
+<meta name="theme-color" content="#c0392b">
+<title>汉字闪卡 · Chinese Flashcards</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=Long+Cang&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fdf6e8;
+    --panel-bg: #ffffff;
+    --accent: #c0392b;
+    --accent2: #e67e22;
+    --text: #2c1810;
+    --muted: #8a7060;
+    --border: #e8d8c0;
+    --shadow: rgba(44,24,16,0.12);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans SC', sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding-top: var(--safe-top); }
+
+  header { background: var(--accent); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 12px var(--shadow); position: relative; z-index: 10; }
+  header h1 { font-family: 'Noto Serif SC', serif; font-size: 1.3rem; font-weight: 900; letter-spacing: 2px; }
+  header .tagline { font-size: 0.8rem; opacity: 0.75; margin-left: auto; }
+
+  /* Offline badge */
+  #offlineBadge { display: none; background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; letter-spacing: 1px; }
+  body.offline #offlineBadge { display: inline-block; }
+
+  .app { display: grid; grid-template-columns: 300px 1fr; flex: 1; }
+
+  .sidebar { background: var(--panel-bg); border-right: 1.5px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; max-height: calc(100vh - 52px - var(--safe-top)); position: sticky; top: 0; -webkit-overflow-scrolling: touch; }
+  .sidebar-section { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-section h3 { font-size: 0.65rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+
+  .deck-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .deck-select { flex: 1; border: 1.5px solid var(--border); border-radius: 6px; padding: 7px 8px; font-size: 0.83rem; font-family: 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); outline: none; cursor: pointer; }
+  .deck-select:focus { border-color: var(--accent); }
+  .btn-icon { background: none; border: 1.5px solid var(--border); border-radius: 6px; width: 34px; height: 34px; cursor: pointer; font-size: 0.95rem; color: var(--muted); display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon.danger:hover { border-color: #e74c3c; color: #e74c3c; }
+  .deck-actions { display: flex; gap: 6px; }
+  .btn-deck { flex: 1; padding: 7px 4px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer; font-family: 'Noto Sans SC', sans-serif; font-size: 0.76rem; color: var(--text); transition: all 0.15s; font-weight: 600; }
+  .btn-deck:hover, .btn-deck:active { border-color: var(--accent2); background: #fff8f0; color: var(--accent2); }
+
+  .card-list { display: flex; flex-direction: column; gap: 5px; }
+  .card-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; border: 1.5px solid transparent; transition: all 0.15s; background: #fdf6e8; }
+  .card-item:active { border-color: var(--accent2); background: #fff8f0; }
+  .card-item.active { border-color: var(--accent); background: #fff0ee; }
+  .card-item .ci-char { font-family: 'Noto Serif SC', serif; font-size: 1.3rem; color: var(--accent); min-width: 32px; text-align: center; }
+  .card-item .ci-info { flex: 1; overflow: hidden; }
+  .card-item .ci-pinyin { font-size: 0.66rem; color: var(--muted); }
+  .card-item .ci-meaning { font-size: 0.76rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-item .del-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 0.9rem; padding: 4px 6px; border-radius: 4px; transition: color 0.15s; }
+  .card-item .del-btn:active { color: var(--accent); }
+
+  .add-form { display: flex; flex-direction: column; gap: 7px; }
+  .add-form input, .add-form textarea { width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 6px; font-family: 'Noto Sans SC', sans-serif; font-size: 16px; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.15s; }
+  .add-form input:focus, .add-form textarea:focus { border-color: var(--accent); }
+  .add-form textarea { resize: vertical; min-height: 48px; }
+  .btn-add { background: var(--accent); color: white; border: none; border-radius: 6px; padding: 10px; cursor: pointer; font-family: 'Noto Sans SC', sans-serif; font-size: 0.85rem; font-weight: 700; letter-spacing: 1px; transition: background 0.15s; }
+  .btn-add:active { background: #a93226; }
+
+  .style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .style-field { display: flex; flex-direction: column; gap: 3px; }
+  .style-field label { font-size: 0.66rem; color: var(--muted); font-weight: 600; }
+  .style-field select, .style-field input[type=range] { border: 1.5px solid var(--border); border-radius: 5px; padding: 5px 6px; font-size: 0.78rem; background: var(--bg); color: var(--text); outline: none; cursor: pointer; font-family: inherit; }
+  .style-field input[type=color] { border: 1.5px solid var(--border); border-radius: 5px; height: 34px; width: 100%; cursor: pointer; padding: 2px; background: var(--bg); }
+  .style-field input[type=range] { padding: 8px 0; accent-color: var(--accent); }
+  .style-field .range-val { font-size: 0.68rem; color: var(--muted); text-align: right; }
+  .full-field { grid-column: 1/-1; }
+
+  .play-controls { display: flex; flex-direction: column; gap: 7px; }
+  .play-row { display: flex; gap: 7px; }
+  .btn-play { flex: 1; padding: 10px; border: none; border-radius: 7px; cursor: pointer; font-family: 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 0.82rem; letter-spacing: 1px; transition: all 0.15s; }
+  .btn-green { background: #27ae60; color: white; }
+  .btn-green:active { background: #219a52; }
+  .btn-orange { background: var(--accent2); color: white; }
+  .btn-orange:active { background: #d35400; }
+  .btn-blue { background: #2980b9; color: white; }
+  .btn-blue:active { background: #2171a0; }
+  .duration-row { display: flex; align-items: center; gap: 7px; font-size: 0.76rem; color: var(--muted); }
+  .duration-row input[type=range] { flex: 1; accent-color: var(--accent); }
+
+  .display-area { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px 20px; position: relative; min-height: 400px; }
+  .progress-bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--border); }
+  .progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; }
+
+  .flashcard-wrap { perspective: 1200px; cursor: pointer; user-select: none; touch-action: manipulation; }
+  .flashcard { width: 460px; max-width: 90vw; min-height: 300px; position: relative; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(0.23,1,0.32,1); border-radius: 20px; }
+  .flashcard.flipped { transform: rotateY(180deg); }
+  .card-face { position: absolute; inset: 0; border-radius: 20px; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 24px; box-shadow: 0 12px 48px var(--shadow), 0 2px 8px rgba(0,0,0,0.06); gap: 10px; }
+  .card-front { background: var(--panel-bg); }
+  .card-back { background: #fffaf5; transform: rotateY(180deg); }
+  .card-char { line-height: 1.1; transition: all 0.3s; }
+  .card-pinyin { color: var(--muted); font-size: 1rem; letter-spacing: 1px; }
+  .card-meaning { color: var(--text); font-size: 0.95rem; text-align: center; line-height: 1.6; max-width: 320px; }
+  .card-example { color: #999; font-size: 0.84rem; font-style: italic; text-align: center; max-width: 320px; }
+  .flip-hint { position: absolute; bottom: 12px; right: 16px; font-size: 0.66rem; color: #bbb; letter-spacing: 1px; }
+  .card-tag { position: absolute; top: 14px; left: 18px; font-size: 0.6rem; font-weight: 700; letter-spacing: 2px; color: #ccc; text-transform: uppercase; }
+  .nav-row { display: flex; align-items: center; gap: 18px; margin-top: 22px; }
+  .btn-nav { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--border); background: var(--panel-bg); cursor: pointer; font-size: 1.2rem; color: var(--text); transition: all 0.15s; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px var(--shadow); touch-action: manipulation; }
+  .btn-nav:active { border-color: var(--accent); color: var(--accent); background: #fff0ee; }
+  .counter { font-size: 0.82rem; color: var(--muted); font-weight: 600; min-width: 60px; text-align: center; }
+  .deck-badge { font-size: 0.73rem; color: var(--muted); margin-bottom: -8px; font-weight: 600; }
+  .empty-state { text-align: center; color: var(--muted); padding: 50px 20px; }
+  .empty-state .big { font-size: 2.8rem; margin-bottom: 10px; }
+  .empty-state p { font-size: 0.88rem; line-height: 1.7; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 24px 24px 20px; width: 100%; max-width: 320px; box-shadow: 0 24px 64px rgba(0,0,0,0.3); }
+  .modal h2 { font-family: 'Noto Serif SC', serif; font-size: 1.05rem; margin-bottom: 12px; color: var(--text); }
+  .modal input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'Noto Sans SC', sans-serif; font-size: 16px; outline: none; color: var(--text); }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; margin-top: 14px; }
+  .modal-btns button { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-family: 'Noto Sans SC', sans-serif; font-weight: 700; font-size: 0.9rem; transition: background 0.15s; }
+  .btn-confirm { background: var(--accent); color: white; }
+  .btn-confirm:active { background: #a93226; }
+  .btn-cancel { background: var(--border); color: var(--text); }
+  .btn-cancel:active { background: #d4c4b0; }
+
+  /* Fullscreen */
+  .fullscreen-overlay { display: none; position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; flex-direction: column; gap: 22px; padding-bottom: var(--safe-bottom); }
+  .fullscreen-overlay.active { display: flex; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .fs-bg { position: absolute; inset: 0; z-index: 0; }
+  .fs-card { position: relative; z-index: 2; border-radius: 24px; padding: 48px 64px; min-width: 460px; max-width: 88vw; display: flex; flex-direction: column; align-items: center; gap: 16px; box-shadow: 0 32px 100px rgba(0,0,0,0.35); cursor: pointer; background: rgba(255,255,255,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1.5px solid rgba(255,255,255,0.3); animation: cardIn 0.4s cubic-bezier(0.23,1,0.32,1); touch-action: manipulation; }
+  @keyframes cardIn { from { transform: scale(0.88) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+  .fs-char { line-height: 1.1; text-align: center; color: white; }
+  .fs-pinyin { font-size: 1.4rem; letter-spacing: 2px; opacity: 0.75; text-align: center; color: white; }
+  .fs-meaning { font-size: 1.2rem; text-align: center; line-height: 1.6; max-width: 540px; color: white; }
+  .fs-example { font-size: 0.95rem; text-align: center; opacity: 0.6; max-width: 500px; font-style: italic; color: white; }
+  .fs-flip-hint { font-size: 0.66rem; color: rgba(255,255,255,0.4); letter-spacing: 1px; margin-top: 4px; }
+  .fs-controls { position: relative; z-index: 2; display: flex; align-items: center; gap: 16px; }
+  .btn-fs-nav { width: 54px; height: 54px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: white; cursor: pointer; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.15s; touch-action: manipulation; }
+  .btn-fs-nav:active { background: rgba(255,255,255,0.3); }
+  .fs-counter { color: rgba(255,255,255,0.85); font-size: 0.95rem; min-width: 70px; text-align: center; font-weight: 600; }
+  .btn-fs-close { position: fixed; top: calc(20px + var(--safe-top)); right: 24px; z-index: 10; background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1.5px solid rgba(255,255,255,0.35); color: white; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: background 0.15s; touch-action: manipulation; }
+  .btn-fs-close:active { background: rgba(255,255,255,0.35); }
+
+  .fs-mode-toggle { position: fixed; top: calc(20px + var(--safe-top)); left: 24px; z-index: 10; display: flex; gap: 8px; }
+  .btn-fs-mode { padding: 8px 14px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: rgba(255,255,255,0.65); cursor: pointer; font-size: 0.76rem; font-family: 'Noto Sans SC', sans-serif; font-weight: 700; letter-spacing: 1px; transition: all 0.15s; touch-action: manipulation; }
+  .btn-fs-mode.active { background: rgba(255,255,255,0.9); color: var(--accent); border-color: transparent; }
+  .btn-fs-mode:active:not(.active) { background: rgba(255,255,255,0.22); color: white; }
+
+  .fs-progress { position: fixed; top: 0; left: 0; right: 0; height: 5px; z-index: 10; background: rgba(255,255,255,0.18); }
+  .fs-progress-fill { height: 100%; background: white; transition: width 0.4s; }
+  .fs-timer-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 6px; z-index: 10; background: rgba(255,255,255,0.13); padding-bottom: var(--safe-bottom); }
+  .fs-timer-fill { height: 100%; background: rgba(255,255,255,0.7); }
+  .fs-hint { position: fixed; bottom: calc(14px + var(--safe-bottom)); color: rgba(255,255,255,0.38); font-size: 0.7rem; letter-spacing: 1.5px; z-index: 10; text-align: center; left: 0; right: 0; }
+
+  .slide-out-left { animation: slideOutLeft 0.26s forwards; }
+  .slide-in-right { animation: slideInRight 0.26s forwards; }
+  .slide-out-right { animation: slideOutRight 0.26s forwards; }
+  .slide-in-left { animation: slideInLeft 0.26s forwards; }
+  @keyframes slideOutLeft { to { transform: translateX(-80px); opacity: 0; } }
+  @keyframes slideInRight { from { transform: translateX(80px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideOutRight { to { transform: translateX(80px); opacity: 0; } }
+  @keyframes slideInLeft { from { transform: translateX(-80px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* Mobile layout */
+  @media (max-width: 700px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { max-height: 42vh; position: relative; border-right: none; border-bottom: 1.5px solid var(--border); }
+    .flashcard { width: 320px; min-height: 220px; }
+    .fs-card { min-width: unset; width: 90vw; padding: 36px 24px; }
+    .fs-mode-toggle { top: auto; bottom: calc(72px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); white-space: nowrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.5rem">📚</span>
+  <h1>汉字闪卡</h1>
+  <span id="offlineBadge">离线</span>
+  <span class="tagline">Chinese Flashcards</span>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h3>卡片集</h3>
+      <div class="deck-header">
+        <select class="deck-select" id="deckSelect" onchange="switchDeck()"></select>
+        <button class="btn-icon danger" title="删除当前卡片集" onclick="deleteDeck()">🗑</button>
+      </div>
+      <div class="deck-actions">
+        <button class="btn-deck" onclick="openNewDeckModal()">＋ 新建卡片集</button>
+        <button class="btn-deck" onclick="renameDeck()">✏ 重命名</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>生词列表</h3>
+      <div class="card-list" id="cardList"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>添加生词</h3>
+      <div class="add-form">
+        <input id="inputChar" placeholder="汉字（必填）" maxlength="20" autocomplete="off">
+        <input id="inputPinyin" placeholder="拼音（选填）" autocomplete="off">
+        <input id="inputMeaning" placeholder="意思（选填）" autocomplete="off">
+        <textarea id="inputExample" placeholder="例句（选填）"></textarea>
+        <button class="btn-add" onclick="addCard()">＋ 添加到当前卡片集</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>样式设置</h3>
+      <div class="style-grid">
+        <div class="style-field full-field">
+          <label>字体</label>
+          <select id="fontSelect" onchange="applyStyle()">
+            <option value="'Noto Serif SC', serif">宋体（Noto Serif）</option>
+            <option value="'ZCOOL XiaoWei', serif">小薇体</option>
+            <option value="'Ma Shan Zheng', cursive">马善政楷体</option>
+            <option value="'Zhi Mang Xing', cursive">指芒行书</option>
+            <option value="'Long Cang', cursive">龙藏体</option>
+            <option value="'Noto Sans SC', sans-serif">黑体（Noto Sans）</option>
+          </select>
+        </div>
+        <div class="style-field full-field">
+          <label>汉字大小 <span class="range-val" id="sizeVal">96px</span></label>
+          <input type="range" id="fontSize" min="48" max="200" value="96" oninput="applyStyle()">
+        </div>
+        <div class="style-field">
+          <label>汉字颜色</label>
+          <input type="color" id="charColor" value="#c0392b" oninput="applyStyle()">
+        </div>
+        <div class="style-field">
+          <label>卡片背景</label>
+          <input type="color" id="cardBg" value="#ffffff" oninput="applyStyle()">
+        </div>
+        <div class="style-field">
+          <label>拼音颜色</label>
+          <input type="color" id="pinyinColor" value="#8a7060" oninput="applyStyle()">
+        </div>
+        <div class="style-field">
+          <label>文字颜色</label>
+          <input type="color" id="textColor" value="#2c1810" oninput="applyStyle()">
+        </div>
+        <div class="style-field full-field">
+          <label>全屏背景</label>
+          <select id="fsBgSelect" onchange="applyStyle()">
+            <option value="linear-gradient(135deg,#c0392b,#e67e22)">红橙渐变</option>
+            <option value="linear-gradient(135deg,#2c3e50,#3498db)">深蓝渐变</option>
+            <option value="linear-gradient(135deg,#27ae60,#2ecc71)">翠绿渐变</option>
+            <option value="linear-gradient(135deg,#8e44ad,#9b59b6)">紫色渐变</option>
+            <option value="linear-gradient(135deg,#1a1a2e,#16213e)">夜空</option>
+            <option value="linear-gradient(135deg,#f9ca24,#f0932b)">阳光橙</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>播放控制</h3>
+      <div class="play-controls">
+        <div class="duration-row">
+          <span>自动间隔</span>
+          <input type="range" id="duration" min="1" max="15" value="3" oninput="document.getElementById('durVal').textContent=this.value+'秒'">
+          <span id="durVal">3秒</span>
+        </div>
+        <div class="play-row">
+          <button class="btn-play btn-green" id="btnAutoplay" onclick="toggleAutoplay()">▶ 自动播放</button>
+          <button class="btn-play btn-orange" onclick="shuffleCards()">⇄ 打乱</button>
+        </div>
+        <div class="play-row">
+          <button class="btn-play btn-blue" onclick="openFullscreen()">⛶ 全屏模式</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="display-area">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div id="emptyState" class="empty-state">
+      <div class="big">汉</div>
+      <p>新建一个卡片集<br>然后添加生词开始学习！</p>
+    </div>
+    <div id="cardDisplay" style="display:none; flex-direction:column; align-items:center; gap:22px;">
+      <div class="deck-badge" id="deckBadge"></div>
+      <div class="flashcard-wrap" onclick="flipCard()">
+        <div class="flashcard" id="flashcard">
+          <div class="card-face card-front" id="cardFront">
+            <div class="card-tag">FRONT</div>
+            <div class="card-char" id="frontChar"></div>
+            <div class="card-pinyin" id="frontPinyin"></div>
+            <div class="flip-hint">点击翻转 ↻</div>
+          </div>
+          <div class="card-face card-back" id="cardBack">
+            <div class="card-tag">BACK</div>
+            <div class="card-char" id="backChar" style="font-size:2rem"></div>
+            <div class="card-meaning" id="backMeaning"></div>
+            <div class="card-example" id="backExample"></div>
+            <div class="flip-hint">点击翻转 ↻</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-nav" onclick="navigate(-1)">◀</button>
+        <span class="counter" id="counter">1 / 1</span>
+        <button class="btn-nav" onclick="navigate(1)">▶</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- New deck modal -->
+<div class="modal-overlay" id="newDeckModal">
+  <div class="modal">
+    <h2>新建卡片集</h2>
+    <input id="newDeckName" placeholder="例如：第一课、颜色、家人…" maxlength="30">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('newDeckModal')">取消</button>
+      <button class="btn-confirm" onclick="createDeck()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fullscreen -->
+<div class="fullscreen-overlay" id="fsOverlay">
+  <div class="fs-bg" id="fsBg"></div>
+  <div class="fs-progress"><div class="fs-progress-fill" id="fsProgressFill"></div></div>
+  <div class="fs-mode-toggle">
+    <button class="btn-fs-mode active" id="btnFsAuto" onclick="setFsMode('auto')">⏱ 自动</button>
+    <button class="btn-fs-mode" id="btnFsManual" onclick="setFsMode('manual')">👆 手动</button>
+  </div>
+  <button class="btn-fs-close" onclick="closeFullscreen()">✕</button>
+  <div class="fs-card" id="fsCard" onclick="fsFlip()">
+    <div id="fsInner" style="display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;">
+      <div class="fs-char" id="fsChar"></div>
+      <div class="fs-pinyin" id="fsPinyin"></div>
+      <div class="fs-meaning" id="fsMeaning" style="display:none"></div>
+      <div class="fs-example" id="fsExample" style="display:none"></div>
+    </div>
+    <div class="fs-flip-hint">点击卡片翻转 ↻</div>
+  </div>
+  <div class="fs-controls">
+    <button class="btn-fs-nav" onclick="fsNavigate(-1)">◀</button>
+    <span class="fs-counter" id="fsCounter">1 / 1</span>
+    <button class="btn-fs-nav" onclick="fsNavigate(1)">▶</button>
+  </div>
+  <div class="fs-timer-bar" id="fsTimerBar"><div class="fs-timer-fill" id="fsTimerFill" style="width:100%"></div></div>
+  <div class="fs-hint" id="fsHintText">← → 翻页　点击卡片翻转　ESC 退出</div>
+</div>
+
+<script>
+const STORAGE_KEY = 'hanzifk_v3';
+
+let data = {
+  decks: [{ id:'demo', name:'示例：第一课', cards:[
+    { char:'你好', pinyin:'nǐ hǎo',  meaning:'Hello',     example:'你好，很高兴认识你。' },
+    { char:'谢谢', pinyin:'xiè xiè', meaning:'Thank you', example:'谢谢你的帮助！' },
+    { char:'水',   pinyin:'shuǐ',    meaning:'Water',     example:'' },
+    { char:'书',   pinyin:'shū',     meaning:'Book',      example:'这本书很有趣。' },
+  ]}],
+  activeDeckId: 'demo',
+  style: { font:"'Noto Serif SC', serif", fontSize:96, charColor:'#c0392b', cardBg:'#ffffff', pinyinColor:'#8a7060', textColor:'#2c1810', fsBg:'linear-gradient(135deg,#c0392b,#e67e22)' }
+};
+
+let current=0, isFlipped=false, isAutoPlaying=false, autoTimer=null;
+let fsCurrent=0, fsFlipped=false, fsMode='auto', fsTimer=null;
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+// Persistence
+function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){} }
+function load(){
+  try{ const r=localStorage.getItem(STORAGE_KEY); if(r){ const p=JSON.parse(r); if(p&&p.decks) data=p; } }catch(e){}
+  if(!data.activeDeckId && data.decks.length) data.activeDeckId=data.decks[0].id;
+}
+
+function activeDeck(){ return data.decks.find(d=>d.id===data.activeDeckId)||data.decks[0]||null; }
+function activeCards(){ const d=activeDeck(); return d?d.cards:[]; }
+
+// Decks
+function renderDeckSelect(){
+  const sel=document.getElementById('deckSelect'); sel.innerHTML='';
+  data.decks.forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=`${d.name}（${d.cards.length}张）`; if(d.id===data.activeDeckId) o.selected=true; sel.appendChild(o); });
+}
+function switchDeck(){ data.activeDeckId=document.getElementById('deckSelect').value; current=0; isFlipped=false; save(); render(); }
+function openNewDeckModal(){ document.getElementById('newDeckName').value=''; document.getElementById('newDeckModal').classList.add('active'); setTimeout(()=>document.getElementById('newDeckName').focus(),80); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+function createDeck(){
+  const name=document.getElementById('newDeckName').value.trim();
+  if(!name){ alert('请输入卡片集名称！'); return; }
+  const deck={id:uid(),name,cards:[]}; data.decks.push(deck); data.activeDeckId=deck.id; current=0; isFlipped=false;
+  save(); closeModal('newDeckModal'); render();
+}
+function deleteDeck(){
+  const deck=activeDeck(); if(!deck) return;
+  if(data.decks.length===1){ alert('至少保留一个卡片集！'); return; }
+  if(!confirm(`确定删除「${deck.name}」及其所有卡片吗？`)) return;
+  data.decks=data.decks.filter(d=>d.id!==deck.id); data.activeDeckId=data.decks[0].id; current=0; isFlipped=false;
+  save(); render();
+}
+function renameDeck(){
+  const deck=activeDeck(); if(!deck) return;
+  const name=prompt('新名称：',deck.name);
+  if(name&&name.trim()){ deck.name=name.trim(); save(); render(); }
+}
+
+// Cards
+function addCard(){
+  const deck=activeDeck(); if(!deck){ alert('请先创建一个卡片集！'); return; }
+  const char=document.getElementById('inputChar').value.trim();
+  if(!char){ alert('请填写汉字！'); return; }
+  deck.cards.push({ char, pinyin:document.getElementById('inputPinyin').value.trim(), meaning:document.getElementById('inputMeaning').value.trim(), example:document.getElementById('inputExample').value.trim() });
+  ['inputChar','inputPinyin','inputMeaning','inputExample'].forEach(id=>document.getElementById(id).value='');
+  current=deck.cards.length-1; save(); render();
+}
+function deleteCard(i){
+  const deck=activeDeck(); if(!deck) return;
+  deck.cards.splice(i,1); if(current>=deck.cards.length) current=Math.max(0,deck.cards.length-1);
+  save(); render();
+}
+function shuffleCards(){
+  const cards=activeCards();
+  for(let i=cards.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [cards[i],cards[j]]=[cards[j],cards[i]]; }
+  current=0; isFlipped=false; save(); render();
+}
+
+// Style
+function applyStyle(){
+  const s=data.style;
+  s.font=document.getElementById('fontSelect').value; s.fontSize=document.getElementById('fontSize').value;
+  s.charColor=document.getElementById('charColor').value; s.cardBg=document.getElementById('cardBg').value;
+  s.pinyinColor=document.getElementById('pinyinColor').value; s.textColor=document.getElementById('textColor').value;
+  s.fsBg=document.getElementById('fsBgSelect').value;
+  document.getElementById('sizeVal').textContent=s.fontSize+'px';
+  save(); renderCurrentCard(); renderFsCard();
+}
+function syncStyleControls(){
+  const s=data.style;
+  document.getElementById('fontSelect').value=s.font; document.getElementById('fontSize').value=s.fontSize;
+  document.getElementById('charColor').value=s.charColor; document.getElementById('cardBg').value=s.cardBg;
+  document.getElementById('pinyinColor').value=s.pinyinColor; document.getElementById('textColor').value=s.textColor;
+  document.getElementById('fsBgSelect').value=s.fsBg; document.getElementById('sizeVal').textContent=s.fontSize+'px';
+}
+
+// Render
+function render(){ renderDeckSelect(); renderList(); renderCurrentCard(); updateProgress(); }
+function renderList(){
+  const cards=activeCards(); const list=document.getElementById('cardList'); list.innerHTML='';
+  if(!cards.length){ list.innerHTML='<p style="font-size:0.76rem;color:#bbb;padding:6px 0">暂无卡片，请添加生词</p>'; return; }
+  cards.forEach((c,i)=>{
+    const el=document.createElement('div'); el.className='card-item'+(i===current?' active':'');
+    el.innerHTML=`<div class="ci-char">${c.char}</div><div class="ci-info"><div class="ci-pinyin">${c.pinyin||'—'}</div><div class="ci-meaning">${c.meaning||'—'}</div></div><button class="del-btn" onclick="event.stopPropagation();deleteCard(${i})">✕</button>`;
+    el.addEventListener('click',()=>{ current=i; isFlipped=false; render(); }); list.appendChild(el);
+  });
+}
+function renderCurrentCard(){
+  const cards=activeCards(); const s=data.style;
+  const display=document.getElementById('cardDisplay'); const empty=document.getElementById('emptyState');
+  if(!cards.length){ display.style.display='none'; empty.style.display='block'; return; }
+  display.style.display='flex'; empty.style.display='none';
+  const c=cards[current]||cards[0];
+  document.getElementById('cardFront').style.background=s.cardBg;
+  document.getElementById('cardBack').style.background=s.cardBg==='#ffffff'?'#fffaf5':s.cardBg;
+  const fc=document.getElementById('frontChar'); fc.textContent=c.char; fc.style.fontFamily=s.font; fc.style.fontSize=s.fontSize+'px'; fc.style.color=s.charColor;
+  const fp=document.getElementById('frontPinyin'); fp.textContent=c.pinyin||''; fp.style.color=s.pinyinColor;
+  const bc=document.getElementById('backChar'); bc.textContent=c.char; bc.style.fontFamily=s.font; bc.style.color=s.charColor;
+  const bm=document.getElementById('backMeaning'); bm.textContent=c.meaning||''; bm.style.color=s.textColor;
+  document.getElementById('backExample').textContent=c.example||'';
+  document.getElementById('flashcard').classList.toggle('flipped',isFlipped);
+  document.getElementById('counter').textContent=`${current+1} / ${cards.length}`;
+  const deck=activeDeck(); document.getElementById('deckBadge').textContent=deck?`📂 ${deck.name}`:'';
+}
+function updateProgress(){
+  const cards=activeCards(); const pct=cards.length<=1?100:(current/(cards.length-1))*100;
+  document.getElementById('progressFill').style.width=pct+'%';
+}
+
+// Navigation
+function navigate(dir){ const cards=activeCards(); if(!cards.length) return; isFlipped=false; current=(current+dir+cards.length)%cards.length; render(); }
+function flipCard(){ isFlipped=!isFlipped; document.getElementById('flashcard').classList.toggle('flipped',isFlipped); }
+
+// Autoplay
+function toggleAutoplay(){
+  const btn=document.getElementById('btnAutoplay');
+  if(isAutoPlaying){ clearInterval(autoTimer); isAutoPlaying=false; btn.textContent='▶ 自动播放'; btn.style.background='#27ae60'; }
+  else{ isAutoPlaying=true; btn.textContent='⏸ 暂停'; btn.style.background='#e74c3c'; const sec=parseInt(document.getElementById('duration').value); autoTimer=setInterval(()=>navigate(1),sec*1000); }
+}
+
+// Fullscreen
+function openFullscreen(){
+  if(!activeCards().length){ alert('请先添加生词！'); return; }
+  fsCurrent=current; fsFlipped=false; renderFsCard();
+  document.getElementById('fsOverlay').classList.add('active');
+  document.documentElement.requestFullscreen?.().catch(()=>{});
+  setFsMode(fsMode);
+}
+function closeFullscreen(){
+  document.getElementById('fsOverlay').classList.remove('active');
+  clearInterval(fsTimer); fsTimer=null;
+  document.exitFullscreen?.().catch(()=>{});
+}
+function setFsMode(mode){
+  fsMode=mode; clearInterval(fsTimer); fsTimer=null;
+  document.getElementById('btnFsAuto').classList.toggle('active',mode==='auto');
+  document.getElementById('btnFsManual').classList.toggle('active',mode==='manual');
+  const timerBar=document.getElementById('fsTimerBar'); const hint=document.getElementById('fsHintText');
+  if(mode==='auto'){ timerBar.style.display='block'; hint.textContent='← → 翻页　点击卡片翻转　ESC 退出'; startFsTimer(); }
+  else{ timerBar.style.display='none'; hint.textContent='← → 或滑动翻页　点击卡片翻转　ESC 退出'; const fill=document.getElementById('fsTimerFill'); fill.style.transition='none'; fill.style.width='100%'; }
+}
+function renderFsCard(){
+  const cards=activeCards(); if(!cards.length) return;
+  const c=cards[fsCurrent]; const s=data.style;
+  document.getElementById('fsBg').style.background=s.fsBg;
+  const fc=document.getElementById('fsChar'); fc.textContent=c.char; fc.style.fontFamily=s.font; fc.style.fontSize=Math.max(parseInt(s.fontSize)*2,120)+'px';
+  document.getElementById('fsPinyin').textContent=c.pinyin||'';
+  const fm=document.getElementById('fsMeaning'); fm.textContent=c.meaning||''; fm.style.display=(fsFlipped&&c.meaning)?'block':'none';
+  const fe=document.getElementById('fsExample'); fe.textContent=c.example||''; fe.style.display=(fsFlipped&&c.example)?'block':'none';
+  const pct=cards.length<=1?100:(fsCurrent/(cards.length-1))*100;
+  document.getElementById('fsProgressFill').style.width=pct+'%';
+  document.getElementById('fsCounter').textContent=`${fsCurrent+1} / ${cards.length}`;
+}
+function fsFlip(){ fsFlipped=!fsFlipped; renderFsCard(); }
+function fsNavigate(dir){
+  const cards=activeCards(); fsFlipped=false; fsCurrent=(fsCurrent+dir+cards.length)%cards.length;
+  const card=document.getElementById('fsCard');
+  card.classList.add(dir>0?'slide-out-left':'slide-out-right');
+  setTimeout(()=>{ card.classList.remove('slide-out-left','slide-out-right'); renderFsCard(); card.classList.add(dir>0?'slide-in-right':'slide-in-left'); setTimeout(()=>card.classList.remove('slide-in-right','slide-in-left'),260); },240);
+  if(fsMode==='auto') resetFsTimer();
+}
+function startFsTimer(){
+  clearInterval(fsTimer); const sec=parseInt(document.getElementById('duration').value);
+  const fill=document.getElementById('fsTimerFill'); fill.style.transition=`width ${sec}s linear`; fill.style.width='0%';
+  fsTimer=setInterval(()=>fsNavigate(1),sec*1000);
+}
+function resetFsTimer(){
+  clearInterval(fsTimer); const sec=parseInt(document.getElementById('duration').value);
+  const fill=document.getElementById('fsTimerFill'); fill.style.transition='none'; fill.style.width='100%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fill.style.transition=`width ${sec}s linear`; fill.style.width='0%'; }));
+  fsTimer=setInterval(()=>fsNavigate(1),sec*1000);
+}
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  const fsActive=document.getElementById('fsOverlay').classList.contains('active');
+  if(fsActive){
+    if(e.key==='Escape') closeFullscreen();
+    else if(e.key===' '||e.key==='ArrowRight'){ e.preventDefault(); fsNavigate(1); }
+    else if(e.key==='ArrowLeft'){ e.preventDefault(); fsNavigate(-1); }
+    else if(e.key==='f'||e.key==='F') fsFlip();
+  } else {
+    if(e.key==='ArrowRight') navigate(1);
+    else if(e.key==='ArrowLeft') navigate(-1);
+    else if(e.key===' '){ e.preventDefault(); flipCard(); }
+  }
+});
+
+// Touch swipe for fullscreen
+let touchStartX=0;
+document.getElementById('fsOverlay').addEventListener('touchstart',e=>{ touchStartX=e.touches[0].clientX; },{passive:true});
+document.getElementById('fsOverlay').addEventListener('touchend',e=>{
+  const diff=touchStartX-e.changedTouches[0].clientX;
+  if(Math.abs(diff)>50){ fsNavigate(diff>0?1:-1); }
+},{passive:true});
+
+document.getElementById('newDeckName').addEventListener('keydown',e=>{ if(e.key==='Enter') createDeck(); });
+
+// Offline detection
+window.addEventListener('online', ()=>document.body.classList.remove('offline'));
+window.addEventListener('offline', ()=>document.body.classList.add('offline'));
+if(!navigator.onLine) document.body.classList.add('offline');
+
+// Register Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+// Init
+load(); syncStyleControls(); render();
+</script>
+</body>
+</html>
